@@ -7,14 +7,19 @@ enum MessageType {
   Ping = 'PING',
 }
 
-interface Message {
+interface SocketMessage {
   type: MessageType;
+  content: string;
+}
+
+interface Message {
+  own: boolean;
   content: string;
 }
 
 function App() {
   const [submitting, setSubmitting] = useState(false);
-  const [messages, setMessages] = useState<string[]>([]);
+  const [messages, setMessages] = useState<Message[]>([]);
   const [messageContent, setMessageContent] = useState('');
   const wsRef = useRef<WebSocket>();
   const bottomRef = useRef<HTMLDivElement>(null);
@@ -29,7 +34,7 @@ function App() {
       console.log('websocket connection closed');
     };
     wsRef.current.onmessage = (ev) => {
-      const message = JSON.parse(ev.data) as Message;
+      const message = JSON.parse(ev.data) as SocketMessage;
       switch (message.type) {
         case MessageType.Acknowledge:
           setSubmitting(false);
@@ -37,7 +42,10 @@ function App() {
           setMessageContent('');
           break;
         case MessageType.Content:
-          setMessages((prev) => [...prev, message.content]);
+          setMessages((prev) => [
+            ...prev,
+            { own: false, content: message.content },
+          ]);
           break;
       }
     };
@@ -51,11 +59,16 @@ function App() {
   }, []);
 
   function handleSubmit() {
+    if (messageContent === '') {
+      return;
+    }
+    setSubmitting(true);
     const message = {
       type: MessageType.Content,
       content: messageContent,
-    } as Message;
+    } as SocketMessage;
     wsRef.current?.send(JSON.stringify(message));
+    setMessages((prev) => [...prev, { own: true, content: messageContent }]);
   }
 
   return (
@@ -64,19 +77,28 @@ function App() {
         <div className="col-md-4"></div>
         <div className="col p-3 vh-100 d-flex flex-column">
           <h1 className="text-center mb-3">Hanashi</h1>
-          <div className="flex-grow-1 overflow-auto d-flex flex-column">
+          <div className="flex-fill overflow-auto d-flex flex-column">
             {messages.map((message, index) => (
-              <div key={index} className="card mb-3 p-2">
-                <span>{message}</span>
+              <div key={index} className="row m-0 mb-3">
+                {!message.own || <div className="col-2 p-0"></div>}
+                <div
+                  className={`col p-0 d-flex justify-content-${
+                    message.own ? 'end' : 'start'
+                  }`}
+                >
+                  <div className="card p-2">
+                    <span>{message.content}</span>
+                  </div>
+                </div>
+                {message.own || <div className="col-2 p-0"></div>}
               </div>
             ))}
-            <div className="flex-grow-1"></div>
+            <div className="flex-fill"></div>
             <div ref={bottomRef}></div>
           </div>
           <div style={{ marginBottom: 'env(safe-area-inset-bottom)' }}>
             <form
               onSubmit={(event) => {
-                setSubmitting(true);
                 handleSubmit();
                 event.preventDefault();
               }}

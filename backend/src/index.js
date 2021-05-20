@@ -17,21 +17,21 @@ const ACKNOWLEDGE = JSON.stringify({
 });
 
 const wsServer = new WebSocket.Server({ server: server });
-wsServer.on('connection', (socket) => {
+wsServer.on('connection', (client) => {
   console.log('new websocket connection');
   console.log(`there are now ${wsServer.clients.size} clients connected`);
 
-  socket.on('message', (data) => {
-    wsServer.clients.forEach((socket) => {
-      if (socket.readyState === WebSocket.OPEN) {
-        socket.send(data)
+  client.on('message', (data) => {
+    wsServer.clients.forEach((recipient) => {
+      if (client !== recipient && recipient.readyState === WebSocket.OPEN) {
+        recipient.send(data);
       }
     });
-    socket.send(ACKNOWLEDGE);
+    client.send(ACKNOWLEDGE);
     console.log('websocket connection received message');
   });
 
-  socket.on('close', () => {
+  client.on('close', () => {
     console.log('websocket connection closed');
     console.log(`there are now ${wsServer.clients.size} clients connected`);
   });
